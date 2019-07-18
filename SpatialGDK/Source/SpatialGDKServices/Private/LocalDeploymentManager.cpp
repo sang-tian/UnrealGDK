@@ -30,9 +30,6 @@ FLocalDeploymentManager::FLocalDeploymentManager()
 	, bStartingSpatialService(false)
 	, bStoppingSpatialService(false)
 {
-	// Get the project name from the spatialos.json.
-	ProjectName = GetProjectName();
-
 	// Don't kick off background processes when running commandlets
 	if (IsRunningCommandlet() == false)
 	{
@@ -86,35 +83,6 @@ void FLocalDeploymentManager::OnWorkerConfigDirectoryChanged(const TArray<FFileC
 	WorkerBuildConfigAsync();
 }
 
-FString FLocalDeploymentManager::GetProjectName()
-{
-	const FString SpatialDirectory = FSpatialGDKServicesModule::GetSpatialOSDirectory();
-
-	FString SpatialFileName = TEXT("spatialos.json");
-	FString SpatialFileResult;
-	FFileHelper::LoadFileToString(SpatialFileResult, *FPaths::Combine(SpatialDirectory, SpatialFileName));
-
-	TSharedPtr<FJsonObject> JsonParsedSpatialFile;
-	if (ParseJson(SpatialFileResult, JsonParsedSpatialFile))
-	{
-		if (JsonParsedSpatialFile->TryGetStringField(TEXT("name"), ProjectName))
-		{
-			return ProjectName;
-		}
-		else
-		{
-			UE_LOG(LogSpatialDeploymentManager, Error, TEXT("'name' does not exist in spatialos.json. Can't read project name."));
-		}
-	}
-	else
-	{
-		UE_LOG(LogSpatialDeploymentManager, Error, TEXT("Json parsing of spatialos.json failed. Can't get project name."));
-	}
-
-	ProjectName.Empty();
-	return ProjectName;
-}
-
 void FLocalDeploymentManager::WorkerBuildConfigAsync()
 {
 	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this]
@@ -122,7 +90,7 @@ void FLocalDeploymentManager::WorkerBuildConfigAsync()
 		FString BuildConfigArgs = TEXT("worker build build-config");
 		FString WorkerBuildConfigResult;
 		int32 ExitCode;
-		ExecuteAndReadOutput(SpatialExe, BuildConfigArgs, FSpatialGDKServicesModule::GetSpatialOSDirectory(), WorkerBuildConfigResult, ExitCode);
+		FSpatialGDKServicesModule::ExecuteAndReadOutput(SpatialExe, BuildConfigArgs, FSpatialGDKServicesModule::GetSpatialOSDirectory(), WorkerBuildConfigResult, ExitCode);
 
 		if (ExitCode == ExitCodeSuccess)
 		{
@@ -133,45 +101,6 @@ void FLocalDeploymentManager::WorkerBuildConfigAsync()
 			UE_LOG(LogSpatialDeploymentManager, Error, TEXT("Building worker configurations failed. Please ensure your .worker.json files are correct. Result: %s"), *WorkerBuildConfigResult);
 		}
 	});
-}
-
-bool FLocalDeploymentManager::ParseJson(const FString& RawJsonString, TSharedPtr<FJsonObject>& JsonParsed)
-{
-	TSharedRef<TJsonReader<TCHAR>> JsonReader = TJsonReaderFactory<TCHAR>::Create(RawJsonString);
-	return FJsonSerializer::Deserialize(JsonReader, JsonParsed);
-}
-
-// ExecuteAndReadOutput exists so that a spatial command window does not spawn when using 'spatial.exe'. It does not however allow reading from StdErr.
-// For other processes which do not spawn cmd windows, use ExecProcess instead.
-void FLocalDeploymentManager::ExecuteAndReadOutput(const FString& Executable, const FString& Arguments, const FString& DirectoryToRun, FString& OutResult, int32& ExitCode)
-{
-	UE_LOG(LogSpatialDeploymentManager, Verbose, TEXT("Executing '%s' with arguments '%s' in directory '%s'"), *Executable, *Arguments, *DirectoryToRun);
-
-	void* ReadPipe = nullptr;
-	void* WritePipe = nullptr;
-	ensure(FPlatformProcess::CreatePipe(ReadPipe, WritePipe));
-
-	FProcHandle ProcHandle = FPlatformProcess::CreateProc(*Executable, *Arguments, false, true, true, nullptr, 1 /*PriorityModifer*/, *DirectoryToRun, WritePipe);
-
-	if (ProcHandle.IsValid())
-	{
-		for (bool bProcessFinished = false; !bProcessFinished; )
-		{
-			bProcessFinished = FPlatformProcess::GetProcReturnCode(ProcHandle, &ExitCode);
-
-			OutResult = OutResult.Append(FPlatformProcess::ReadPipe(ReadPipe));
-			FPlatformProcess::Sleep(0.01f);
-		}
-
-		FPlatformProcess::CloseProc(ProcHandle);
-	}
-	else
-	{
-		UE_LOG(LogSpatialDeploymentManager, Error, TEXT("Execution failed. '%s' with arguments '%s' in directory '%s' "), *Executable, *Arguments, *DirectoryToRun);
-	}
-
-	FPlatformProcess::ClosePipe(0, ReadPipe);
-	FPlatformProcess::ClosePipe(0, WritePipe);
 }
 
 void FLocalDeploymentManager::RefreshServiceStatus()
@@ -225,7 +154,7 @@ bool FLocalDeploymentManager::TryStartLocalDeployment(FString LaunchConfig, FStr
 		TryStartSpatialService();
 	}
 
-	FString SpotCreateArgs = FString::Printf(TEXT("alpha deployment create --launch-config=\"%s\" --name=localdeployment --project-name=%s --json %s"), *LaunchConfig, *ProjectName, *LaunchArgs);
+	FString SpotCreateArgs = FString::Printf(TEXT("alpha deployment create --launch-config=\"%s\" --name=localdeployment --project-name=%s --json %s"), *LaunchConfig, *FSpatialGDKServicesModule::GetProjectName(), *LaunchArgs);
 
 	FDateTime SpotCreateStart = FDateTime::Now();
 
@@ -244,7 +173,7 @@ bool FLocalDeploymentManager::TryStartLocalDeployment(FString LaunchConfig, FStr
 	bool bSuccess = false;
 
 	TSharedPtr<FJsonObject> SpotJsonResult;
-	bool bParsingSuccess = ParseJson(SpotCreateResult, SpotJsonResult);
+	bool bParsingSuccess = FSpatialGDKServicesModule::ParseJson(SpotCreateResult, SpotJsonResult);
 	if (!bParsingSuccess)
 	{
 		UE_LOG(LogSpatialDeploymentManager, Error, TEXT("Json parsing of spot create result failed. Result: %s"), *SpotCreateResult);
@@ -313,7 +242,7 @@ bool FLocalDeploymentManager::TryStopLocalDeployment()
 	bool bSuccess = false;
 
 	TSharedPtr<FJsonObject> SpotJsonResult;
-	bool bPasingSuccess = ParseJson(SpotDeleteResult, SpotJsonResult);
+	bool bPasingSuccess = FSpatialGDKServicesModule::ParseJson(SpotDeleteResult, SpotJsonResult);
 	if (!bPasingSuccess)
 	{
 		UE_LOG(LogSpatialDeploymentManager, Error, TEXT("Json parsing of spot delete result failed. Result: %s"), *SpotDeleteResult);
@@ -362,7 +291,7 @@ bool FLocalDeploymentManager::TryStartSpatialService()
 	FString SpatialServiceStartArgs = TEXT("service start");
 	FString ServiceStartResult;
 	int32 ExitCode;
-	ExecuteAndReadOutput(SpatialExe, SpatialServiceStartArgs, FSpatialGDKServicesModule::GetSpatialOSDirectory(), ServiceStartResult, ExitCode);
+	FSpatialGDKServicesModule::ExecuteAndReadOutput(SpatialExe, SpatialServiceStartArgs, FSpatialGDKServicesModule::GetSpatialOSDirectory(), ServiceStartResult, ExitCode);
 
 	bStartingSpatialService = false;
 
@@ -394,7 +323,7 @@ bool FLocalDeploymentManager::TryStopSpatialService()
 	FString SpatialServiceStartArgs = TEXT("service stop");
 	FString ServiceStopResult;
 	int32 ExitCode;
-	ExecuteAndReadOutput(SpatialExe, SpatialServiceStartArgs, FSpatialGDKServicesModule::GetSpatialOSDirectory(), ServiceStopResult, ExitCode);
+	FSpatialGDKServicesModule::ExecuteAndReadOutput(SpatialExe, SpatialServiceStartArgs, FSpatialGDKServicesModule::GetSpatialOSDirectory(), ServiceStopResult, ExitCode);
 	bStoppingSpatialService = false;
 
 	if (ExitCode == ExitCodeSuccess)
@@ -421,7 +350,7 @@ bool FLocalDeploymentManager::GetLocalDeploymentStatus()
 		return bLocalDeploymentRunning;
 	}
 
-	FString SpotListArgs = FString::Printf(TEXT("alpha deployment list --project-name=%s --json --view BASIC --status-filter NOT_STOPPED_DEPLOYMENTS"), *ProjectName);
+	FString SpotListArgs = FString::Printf(TEXT("alpha deployment list --project-name=%s --json --view BASIC --status-filter NOT_STOPPED_DEPLOYMENTS"), *FSpatialGDKServicesModule::GetProjectName());
 
 	FString SpotListResult;
 	FString StdErr;
@@ -435,7 +364,7 @@ bool FLocalDeploymentManager::GetLocalDeploymentStatus()
 	}
 
 	TSharedPtr<FJsonObject> SpotJsonResult;
-	bool bPasingSuccess = ParseJson(SpotListResult, SpotJsonResult);
+	bool bPasingSuccess = FSpatialGDKServicesModule::ParseJson(SpotListResult, SpotJsonResult);
 	if (!bPasingSuccess)
 	{
 		UE_LOG(LogSpatialDeploymentManager, Error, TEXT("Json parsing of spot list result failed. Result: %s"), *SpotListResult);
@@ -484,7 +413,7 @@ bool FLocalDeploymentManager::GetServiceStatus()
 	FString SpatialServiceStatusArgs = TEXT("service status");
 	FString ServiceStatusResult;
 	int32 ExitCode;
-	ExecuteAndReadOutput(SpatialExe, SpatialServiceStatusArgs, FSpatialGDKServicesModule::GetSpatialOSDirectory(), ServiceStatusResult, ExitCode);
+	FSpatialGDKServicesModule::ExecuteAndReadOutput(SpatialExe, SpatialServiceStatusArgs, FSpatialGDKServicesModule::GetSpatialOSDirectory(), ServiceStatusResult, ExitCode);
 
 	if (ExitCode != ExitCodeSuccess)
 	{
