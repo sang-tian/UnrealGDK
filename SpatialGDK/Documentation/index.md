@@ -11,7 +11,7 @@ SpatialOS provides:<br/>
 * **Global hosting**: Scalable dedicated hosting for your game in every major gaming region.<br/>
 * **Easy playtesting**: Deploy and test your game from the start of development, and distribute it to your team and players quickly and easily with a ready-made link.<br/>
 * **Profiling and debugging tools**: Logs and metrics out of the box to help you quickly understand any bugs and performance issues.
-* **Multiserver networking**: Multiple dedicated servers across one seamless game world, enabling greater numbers of Actors, players and gameplay systems. Note: this feature is currently in preview as we work to improve its stability - we recommend you try it out using the Multiserver Shooter Tutorial, but avoid development with it. 
+* **Single-server and multiserver networking**: Start with a single server and grow your game to multiple dedicated servers across one seamless game world, enabling greater numbers of Actors, players and gameplay systems. Note: multiserver networking is currently in preview as we work to improve its stability - we recommend you try it out using the Multiserver Shooter Tutorial, but avoid development with it. 
 
 ## Get started
 

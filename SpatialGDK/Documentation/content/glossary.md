@@ -209,6 +209,9 @@ The Launcher downloads the client executable from the [SpatialOS assembly](#asse
 > [The Launcher](https://docs.improbable.io/reference/latest/shared/operate/launcher)
 
 ### Load balancing
+
+> The GDK currently offers single-server networking, with support for multiserver zoning and load balancing in pre-alpha. We invite you to try out the [Multiserver Shooter tutorial]({{urlRoot}}/content/tutorials/multiserver-shooter/tutorial-multiserver-intro) and learn about how it works, but we don’t recommend you start developing features that use zoning yet.
+
 One of the features of SpatialOS is load balancing: dynamically adjusting how many [components](#spatialos-component) on [entities](#spatialos-entity) in the [world](#spatialos-world) each [worker](#workers) has [write access](#authority) to, so that workers don’t get overloaded.
 
 Load balancing only applies to [server-workers](#workers).

@@ -16,6 +16,8 @@ For example, you could create a server-worker type called `UnrealWorker`, and yo
 
 ### Zoning
 
+> The GDK currently offers single-server networking, with support for multiserver zoning and load balancing in pre-alpha. We invite you to try out the [Multiserver Shooter tutorial]({{urlRoot}}/content/tutorials/multiserver-shooter/tutorial-multiserver-intro) and learn about how it works, but we don’t recommend you start developing features that use zoning yet.
+
 As outlined above, SpatialOS can use the combined computation of multiple server-worker instances to compute the game world. We call this _zoning_ - splitting up the world into zones, known as “areas of authority”. Each area is simulated by one server-worker instance. This means that the server-worker instances don’t know anything about each other - they might not even be on the same machine in the cloud. 
 
 So when you’re writing the code to define server-worker types, you set them up so that their worker instances only know about a specific part (or parts) of the world.
