@@ -12,9 +12,13 @@
 #include "Components/TeamComponent.h"
 #include "Weapons/Holdable.h"
 #include "TimerManager.h"
+#include "TestRepComponent.h"
+#include "TestRpcActor.h"
 #include "Runtime/AIModule/Classes/GenericTeamAgentInterface.h"
 #include "Runtime/AIModule/Classes/Perception/AISightTargetInterface.h"
 #include "GDKCharacter.generated.h"
+
+struct FMath;
 
 DECLARE_DELEGATE_OneParam(FBoolean, bool);
 DECLARE_DELEGATE_OneParam(FHoldableSelection, int32);
@@ -27,8 +31,19 @@ class GDKSHOOTER_API AGDKCharacter : public ACharacter, public IGenericTeamAgent
 public:
 	AGDKCharacter(const FObjectInitializer& ObjectInitializer);
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	
+	UPROPERTY(ReplicatedUsing=OnRepVar1)
+	int32 Var1;
+
+	UPROPERTY(ReplicatedUsing = OnRepVar2)
+	int32 Var2;
+
+	UPROPERTY(EditDefaultsOnly)
+	UClass* RepActorClass;
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -46,6 +61,12 @@ protected:
 
 	UPROPERTY(Category = Character, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 		UTeamComponent* TeamComponent;
+
+	UPROPERTY(Category = Character, VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+		UTestRepComponent* TestRepComponent;
+
+	UPROPERTY(Replicated)
+	ATestRpcActor* TestRpcActor;
 
 	UFUNCTION(BlueprintPure)
 		float GetRemotePitch() {
@@ -77,6 +98,18 @@ protected:
 	// [client + server] Puts the player in ragdoll mode.
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable)
 		void StartRagdoll();
+
+	UFUNCTION()
+	void OnRepVar1();
+
+	UFUNCTION()
+	void OnRepVar2();
+
+	UFUNCTION()
+	void Interact();
+
+	UFUNCTION(Server, Reliable)
+	void ServerInteract();
 
 private:
 

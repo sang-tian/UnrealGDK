@@ -11,6 +11,7 @@
 #include "Controllers/GDKPlayerController.h"
 #include "Controllers/Components/ControllerEventsComponent.h"
 #include "Weapons/Holdable.h"
+#include "UnrealMathUtility.h"
 
 AGDKCharacter::AGDKCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UGDKMovementComponent>(ACharacter::CharacterMovementComponentName))
@@ -22,7 +23,16 @@ AGDKCharacter::AGDKCharacter(const FObjectInitializer& ObjectInitializer)
 	EquippedComponent = CreateDefaultSubobject<UEquippedComponent>(TEXT("Equipment"));
 	MetaDataComponent = CreateDefaultSubobject<UMetaDataComponent>(TEXT("MetaData"));
 	TeamComponent = CreateDefaultSubobject<UTeamComponent>(TEXT("Team"));
+	TestRepComponent = CreateDefaultSubobject<UTestRepComponent>(TEXT("TestRep"));
 	GDKMovementComponent = Cast<UGDKMovementComponent>(GetCharacterMovement());
+}
+
+void AGDKCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AGDKCharacter, Var1);
+	DOREPLIFETIME(AGDKCharacter, Var2);
 }
 
 // Called when the game starts or when spawned
@@ -72,6 +82,8 @@ void AGDKCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 	PlayerInputComponent->BindAction("ToggleMode", IE_Pressed, EquippedComponent, &UEquippedComponent::ToggleMode);
 	PlayerInputComponent->BindAction("ScrollUp", IE_Pressed, EquippedComponent, &UEquippedComponent::ScrollUp);
 	PlayerInputComponent->BindAction("ScrollDown", IE_Pressed, EquippedComponent, &UEquippedComponent::ScrollDown);
+
+	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AGDKCharacter::Interact);
 }
 
 void AGDKCharacter::MoveForward(float Value)
@@ -146,6 +158,44 @@ void AGDKCharacter::StartRagdoll_Implementation()
 	}
 }
 
+
+void AGDKCharacter::OnRepVar1()
+{
+	UE_LOG(LogTemp, Warning, TEXT("GDKCharacter.Var1 replicated"));
+}
+
+void AGDKCharacter::OnRepVar2()
+{
+	UE_LOG(LogTemp, Warning, TEXT("GDKCharacter.Var2 replicated"));
+}
+
+void AGDKCharacter::Interact()
+{
+	if (!HasAuthority())
+	{
+		ServerInteract();
+	}
+}
+
+void AGDKCharacter::ServerInteract_Implementation()
+{
+	if (!HasAuthority())
+		return;
+
+	Var1 = FMath::Rand();
+	Var2 = FMath::Rand();
+	TestRepComponent->Var3 = FMath::Rand();
+
+	if (TestRpcActor == nullptr)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Name = "TestSubActor";
+		TestRpcActor = GetWorld()->SpawnActor<ATestRpcActor>(RepActorClass, GetActorLocation() + FVector(0, 0, 100), GetActorRotation(), SpawnParams);
+
+		TestRpcActor->AttachToActor(this, FAttachmentTransformRules(EAttachmentRule::KeepRelative, EAttachmentRule::KeepRelative, EAttachmentRule::KeepRelative, false));
+	}
+	TestRpcActor->Var4 = FMath::Rand();
+}
 
 void AGDKCharacter::DeleteSelf()
 {
